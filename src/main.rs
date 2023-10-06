@@ -1,11 +1,14 @@
 #![allow(non_snake_case)]
 
+use std::fmt;
+
 use dioxus_router::prelude::*;
 
 use dioxus::prelude::*;
 use log::LevelFilter;
 
 use anyhow::anyhow;
+use matrix_sdk::{ruma::api::client::session::get_login_types::v3::LoginType, Client};
 use url::Url;
 
 pub static BASE_API_URL: &str = "https://matrix.radical.directory/_matrix/client/v3/publicRooms";
@@ -36,7 +39,7 @@ pub async fn get_public_rooms() -> Result<ApiResponse, reqwest::Error> {
     reqwest::get(&url).await?.json::<ApiResponse>().await
 }
 
-async fn login() -> Result<(), anyhow::Error> {
+async fn login() -> Result<String, anyhow::Error> {
     let homeserver_url = Url::parse("http://matrix.radical.directory")?;
     let client = Client::new(homeserver_url).await?;
 
@@ -72,8 +75,10 @@ async fn login() -> Result<(), anyhow::Error> {
             ))
         }
         1 => choices[0].login(&client).await?,
-        _ => offer_choices_and_login(&client, choices).await?,
-    }
+        _ => (), // offer_choices_and_login(&client, choices).await?,
+    };
+
+    Ok("All done")
 }
 
 fn main() {
@@ -141,4 +146,37 @@ fn Home(cx: Scope) -> Element {
 
         }
     })
+}
+
+#[derive(Debug)]
+enum LoginChoice {
+    /// Login with username and password.
+    Password,
+
+    /// Login with SSO.
+    Sso,
+
+    /// Login with a specific SSO identity provider.
+    SsoIdp(IdentityProvider),
+}
+
+impl LoginChoice {
+    /// Login with this login choice.
+    async fn login(&self, client: &Client) -> anyhow::Result<()> {
+        match self {
+            LoginChoice::Password => (),    //login_with_password(client).await,
+            LoginChoice::Sso => (),         //login_with_sso(client, None).await,
+            LoginChoice::SsoIdp(idp) => (), //login_with_sso(client, Some(idp)).await,
+        }
+    }
+}
+
+impl fmt::Display for LoginChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LoginChoice::Password => write!(f, "Username and password"),
+            LoginChoice::Sso => write!(f, "SSO"),
+            LoginChoice::SsoIdp(idp) => write!(f, "SSO via {}", idp.name),
+        }
+    }
 }
