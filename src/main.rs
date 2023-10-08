@@ -8,7 +8,10 @@ use dioxus::prelude::*;
 use log::LevelFilter;
 
 use anyhow::anyhow;
-use matrix_sdk::{ruma::api::client::session::get_login_types::v3::LoginType, Client};
+use matrix_sdk::{
+    ruma::api::client::session::get_login_types::v3::{IdentityProvider, LoginType},
+    Client,
+};
 use url::Url;
 
 pub static BASE_API_URL: &str = "https://matrix.radical.directory/_matrix/client/v3/publicRooms";
@@ -45,27 +48,23 @@ async fn login() -> Result<String, anyhow::Error> {
 
     // First, let's figure out what login types are supported by the homeserver.
     let mut choices = Vec::new();
-    let login_types = client.matrix_auth().get_login_types().await?.flows;
+    let login_types = client.get_login_types().await?.flows;
 
     for login_type in login_types {
         match login_type {
-                LoginType::Password(_) => {
-                    choices.push(LoginChoice::Password)
+            LoginType::Password(_) => choices.push(LoginChoice::Password),
+            LoginType::Sso(sso) => {
+                if sso.identity_providers.is_empty() {
+                    choices.push(LoginChoice::Sso)
+                } else {
+                    choices.extend(sso.identity_providers.into_iter().map(LoginChoice::SsoIdp))
                 }
-                LoginType::Sso(sso) => {
-                    if sso.identity_providers.is_empty() {
-                        choices.push(LoginChoice::Sso)
-                    } else {
-                        choices.extend(sso.identity_providers.into_iter().map(LoginChoice::SsoIdp))
-                    }
-                }
-                // This is used for SSO, so it's not a separate choice.
-                LoginType::Token(_) |
-                // This is only for application services, ignore it here.
-                LoginType::ApplicationService(_) => {},
-                // We don't support unknown login types.
-                _ => {},
             }
+            // This is used for SSO, so it's not a separate choice.
+            LoginType::Token(_) => {}
+            // We don't support unknown login types.
+            _ => {}
+        }
     }
 
     match choices.len() {
@@ -78,7 +77,7 @@ async fn login() -> Result<String, anyhow::Error> {
         _ => (), // offer_choices_and_login(&client, choices).await?,
     };
 
-    Ok("All done")
+    Ok("All done".to_string())
 }
 
 fn main() {
@@ -148,7 +147,6 @@ fn Home(cx: Scope) -> Element {
     })
 }
 
-#[derive(Debug)]
 enum LoginChoice {
     /// Login with username and password.
     Password,
@@ -164,9 +162,9 @@ impl LoginChoice {
     /// Login with this login choice.
     async fn login(&self, client: &Client) -> anyhow::Result<()> {
         match self {
-            LoginChoice::Password => (),    //login_with_password(client).await,
-            LoginChoice::Sso => (),         //login_with_sso(client, None).await,
-            LoginChoice::SsoIdp(idp) => (), //login_with_sso(client, Some(idp)).await,
+            LoginChoice::Password => Ok(()), //login_with_password(client).await,
+            LoginChoice::Sso => Ok(()),      //login_with_sso(client, None).await,
+            LoginChoice::SsoIdp(idp) => Ok(()), //login_with_sso(client, Some(idp)).await,
         }
     }
 }
