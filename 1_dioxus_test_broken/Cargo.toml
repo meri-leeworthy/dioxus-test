@@ -11,6 +11,7 @@ name = "dioxus-test"
 test = false
 
 [dependencies]
+dioxus-fullstack = { version = "0.4", features = ["router"] }
 dioxus-web = { version = "0.4" }
 dioxus = { version = "0.4" }
 dioxus-router = { version = "0.4", features = ["web"] }
@@ -19,6 +20,14 @@ log = "0.4.19"
 dioxus-logger = "0.4.1"
 console_error_panic_hook = "0.1.7"
 reqwest = { version = "0.11.20", features = ["json"] }
-serde = "1.0"
+serde = { version = "1.0.159", features = ["derive"] }
 url = "2.2.2"
 matrix-sdk = {version = "0.6.2", features = ["sso-login", "anyhow"]}
+getrandom = { version = "0.2", features = ["js"] }
+wasm-bindgen = { version = "0.2.83" }
+wasm-bindgen-futures = "0.4.33"
+
+[features]
+default = []
+ssr = ["dioxus-fullstack/salvo"]
+web = ["dioxus-router/web", "dioxus-fullstack/web"]

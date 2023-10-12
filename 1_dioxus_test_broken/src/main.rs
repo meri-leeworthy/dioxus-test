@@ -1,18 +1,16 @@
 #![allow(non_snake_case)]
-
-use std::fmt;
-
-use dioxus_router::prelude::*;
+#![allow(dead_code)]
 
 use dioxus::prelude::*;
+use dioxus_router::prelude::*;
 use log::LevelFilter;
-
-use anyhow::anyhow;
 use matrix_sdk::{
     ruma::api::client::session::get_login_types::v3::{IdentityProvider, LoginType},
     Client,
 };
+use std::fmt::{self, Error};
 use url::Url;
+use wasm_bindgen::prelude::*;
 
 pub static BASE_API_URL: &str = "https://matrix.radical.directory/_matrix/client/v3/publicRooms";
 
@@ -42,7 +40,8 @@ pub async fn get_public_rooms() -> Result<ApiResponse, reqwest::Error> {
     reqwest::get(&url).await?.json::<ApiResponse>().await
 }
 
-async fn login() -> Result<String, anyhow::Error> {
+#[wasm_bindgen]
+pub async fn login() -> Result<JsValue, JsError> {
     let homeserver_url = Url::parse("http://matrix.radical.directory")?;
     let client = Client::new(homeserver_url).await?;
 
@@ -69,15 +68,13 @@ async fn login() -> Result<String, anyhow::Error> {
 
     match choices.len() {
         0 => {
-            return Err(anyhow!(
+            return Err(JsError::new(&format!(
                 "Homeserver login types incompatible with this client"
-            ))
+            )))
         }
-        1 => choices[0].login(&client).await?,
-        _ => (), // offer_choices_and_login(&client, choices).await?,
+        1 => return Ok("One login type found".to_string().into()), //choices[0].login(&client).await?,
+        _ => return Ok("Several login types found".to_string().into()), // offer_choices_and_login(&client, choices).await?,
     };
-
-    Ok("All done".to_string())
 }
 
 fn main() {
@@ -91,8 +88,6 @@ fn main() {
 
 fn app(cx: Scope) -> Element {
     println!("app");
-
-    //let rooms = use_future(cx, (), |_| get_public_rooms());
 
     // match rooms.value() {
     //     Some(Ok(rooms)) => {
@@ -129,20 +124,27 @@ fn Blog(cx: Scope, id: i32) -> Element {
 
 #[inline_props]
 fn Home(cx: Scope) -> Element {
-    let mut count = use_state(cx, || 0);
+    // let login_types = use_future(cx, (), |_| login());
+    let login_types: Option<Result<String, Error>> = Some(Ok("test".to_string()));
 
-    cx.render(rsx! {
-        Link {
-            to: Route::Blog {
-                id: *count.get()
-            },
-            "Go to blog"
+    cx.render(match login_types {
+        Some(Ok(login_types)) => {
+            println!("{:?}", login_types);
+            rsx! {
+                p { "Login types: {login_types}" }
+            }
         }
-        div {
-            h1 { "High-Five counter: {count}" }
-            button { onclick: move |_| count += 1, "Up high!" }
-            button { onclick: move |_| count -= 1, "Down low!" }
-
+        Some(Err(e)) => {
+            println!("{:?}", e);
+            rsx! {
+                p { "Error: {e}" }
+            }
+        }
+        None => {
+            println!("None");
+            rsx! {
+                p { "Loading..." }
+            }
         }
     })
 }
@@ -160,11 +162,11 @@ enum LoginChoice {
 
 impl LoginChoice {
     /// Login with this login choice.
-    async fn login(&self, client: &Client) -> anyhow::Result<()> {
+    async fn login(&self, _client: &Client) -> anyhow::Result<()> {
         match self {
             LoginChoice::Password => Ok(()), //login_with_password(client).await,
             LoginChoice::Sso => Ok(()),      //login_with_sso(client, None).await,
-            LoginChoice::SsoIdp(idp) => Ok(()), //login_with_sso(client, Some(idp)).await,
+            LoginChoice::SsoIdp(_idp) => Ok(()), //login_with_sso(client, Some(idp)).await,
         }
     }
 }
